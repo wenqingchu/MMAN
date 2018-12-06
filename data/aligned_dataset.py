@@ -190,7 +190,17 @@ class AlignedDataset(BaseDataset):
                 B_L1 = swap_1(B_L1, 14, 15)
                 B_L1 = swap_1(B_L1, 16, 17)
                 B_L1 = swap_1(B_L1, 18, 19)
-                
+
+            if self.opt.dataset == 'helen':
+                B = swap_N(B, 2, 3)
+                B = swap_N(B, 4, 5)
+                B_attribute_GAN = swap_N(B_attribute_GAN, 2, 3)
+                B_attribute_GAN = swap_N(B_attribute_GAN, 4, 5)
+                B_attribute_L1 = swap_1(B_attribute_L1, 2, 3)
+                B_attribute_L1 = swap_1(B_attribute_L1, 4, 5)
+                B_L1 = swap_1(B_L1, 2, 3)
+                B_L1 = swap_1(B_L1, 4, 5)
+
         return {'A': A, 'A_S': A_S, 'A_L': A_L, 'B_L1': B_L1, 'B_GAN': B, 
                 'A_Attribute': A_attribute, 
                 'B_Attribute_L1': B_attribute_L1, 
