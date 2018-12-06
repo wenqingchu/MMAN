@@ -40,7 +40,7 @@ def weights_init_xavier_U(m):
         init.xavier_normal(m.weight.data, gain=1)
     elif classname.find('Linear') != -1:
         init.xavier_normal(m.weight.data, gain=1)
-        
+
 def weights_init_xavier_D(m):
     classname = m.__class__.__name__
     # print(classname)
@@ -99,7 +99,8 @@ def get_norm_layer(norm_type='instance'):
     if norm_type == 'batch':
         norm_layer = functools.partial(nn.BatchNorm2d, affine=True)
     elif norm_type == 'instance':
-        norm_layer = functools.partial(nn.InstanceNorm2d, affine=False)
+        #norm_layer = functools.partial(nn.InstanceNorm2d, affine=False)
+        norm_layer = functools.partial(nn.InstanceNorm2d, affine=False, track_running_stats=False)
     elif norm_type == 'none':
         norm_layer = None
     else:
@@ -200,7 +201,7 @@ def print_network(net):
 class Flatten(nn.Module):
     def forward(self, x):
         return x.view(x.size(0), -1)
-    
+
 # Defines the GAN loss which uses either LSGAN or the regular GAN.
 # When LSGAN is used, it is basically same as MSELoss,
 # but it abstracts away the need to create the target label tensor
@@ -218,7 +219,7 @@ class GANLoss(nn.Module):
             self.loss = nn.MSELoss()
         else:
             self.loss = nn.BCELoss()
-            
+
     def get_target_tensor(self, input, target_is_real):
         target_tensor = None
         if target_is_real:
@@ -343,10 +344,10 @@ class Bottleneck(nn.Module):
         self.ReLU = nn.ReLU()
         self.model_cx = self.build_block(model_cx)
         self.model_x = self.build_block(model_x)
-        
+
     def build_block(self, model):
         return nn.Sequential(*model)
-    
+
     def forward(self, x):
         x = self.ReLU(x)
         if len(self.model_x) == 0:
@@ -362,7 +363,7 @@ class ASPP_Module(nn.Module):
         self.conv1_1.weight.data.normal_(0, 0.01)
         for m in self.conv2d_list:
             m.weight.data.normal_(0, 0.01)
-        
+
     def forward(self, x):
         out = self.conv2d_list[0](x)
         for i in range(len(self.conv2d_list)-1):
@@ -373,34 +374,34 @@ class ASPP_Module(nn.Module):
 class UnetHook():
     def __init__(self):
         self.value = 0
-    
+
     def hook_out(self, module, input, output):
         self.value = output
-        
+
     def get_value(self):
         return self.value
-    
+
     def print_value(self):
         print(self.value)
-    
+
 # Defines the Unet generator.
 # |num_downs|: number of downsamplings in UNet. For example,
 # if |num_downs| == 7, image of size 128x128 will become of size 1x1
 # at the bottleneck
 class UnetGenerator(nn.Module):
-    def __init__(self, input_nc, output_nc, num_downs, hook, ngf=64, 
+    def __init__(self, input_nc, output_nc, num_downs, hook, ngf=64,
                  norm_layer=nn.BatchNorm2d, use_dropout=False, gpu_ids=[]):
         super(UnetGenerator, self).__init__()
         self.gpu_ids = gpu_ids
-        
+
         #Resnet 101
         model_res101 = models.resnet101(pretrained=True)
         model_res101 = model_res101.cuda()
-        
+
         # construct unet structure
         T_block = UnetSkipConnectionBlock(output_nc, ngf * 32, input_nc = ngf * 32, submodule = None, depth = -2, norm_layer = norm_layer, model_ft = model_res101)
         handle = T_block.register_forward_hook(hook.hook_out)
-        U_block = UnetSkipConnectionBlock(output_nc, ngf * 32, input_nc = None, submodule = T_block, depth = -1, norm_layer = norm_layer, model_ft = model_res101) 
+        U_block = UnetSkipConnectionBlock(output_nc, ngf * 32, input_nc = None, submodule = T_block, depth = -1, norm_layer = norm_layer, model_ft = model_res101)
 
         U_block = UnetSkipConnectionBlock(ngf * 16, ngf * 32, input_nc = None, submodule = U_block, depth = 0, norm_layer = norm_layer, model_ft = model_res101)
         U_block = UnetSkipConnectionBlock(ngf * 8, ngf * 16, input_nc = None, submodule = U_block, depth = 1, norm_layer = norm_layer, model_ft = model_res101)
@@ -424,13 +425,13 @@ class UnetSkipConnectionBlock(nn.Module):
     def __init__(self, outer_nc, inner_nc, depth, input_nc=None,
                  submodule=None,  norm_layer=nn.BatchNorm2d, use_dropout=False, model_ft=None):
         super(UnetSkipConnectionBlock, self).__init__()
-        
+
         assert(depth <= 4)
         self.depth = depth
-        
+
         #======================== depth 4 ==========================
         ResBlock0 = [model_ft.conv1, model_ft.bn1]
-    
+
         #======================== depth 3 ==========================
         ResBlock1 = [model_ft.maxpool,]
         for i in range(3):
@@ -439,58 +440,58 @@ class UnetSkipConnectionBlock(nn.Module):
             if i == 0:
                 model_x = [model_ft.layer1[i].downsample[0],
                            model_ft.layer1[i].downsample[1]]
-            model_cx = [model_ft.layer1[i].conv1, 
+            model_cx = [model_ft.layer1[i].conv1,
                         model_ft.layer1[i].bn1,
                         model_ft.layer1[i].conv2,
                         model_ft.layer1[i].bn2,
                         model_ft.layer1[i].conv3,
                         model_ft.layer1[i].bn3]
-            
+
             ResBlock1 += [Bottleneck(model_cx, model_x),]
-        
+
         #======================== depth 2 ==========================
         ResBlock2 = []
         for j in range(4):
             model_x = []
             model_cx = []
             if j == 0:
-                model_x = [model_ft.layer2[j].downsample[0], 
+                model_x = [model_ft.layer2[j].downsample[0],
                            model_ft.layer2[j].downsample[1]]
-            model_cx = [model_ft.layer2[j].conv1, 
+            model_cx = [model_ft.layer2[j].conv1,
                      model_ft.layer2[j].bn1,
                      model_ft.layer2[j].conv2,
                      model_ft.layer2[j].bn2,
                      model_ft.layer2[j].conv3,
                      model_ft.layer2[j].bn3]
             ResBlock2 += [Bottleneck(model_cx, model_x),]
-            
+
         #======================== depth 1 ==========================
         ResBlock3 = []
         for k in range(23):
             model_x = []
             model_cx = []
             if k == 0:
-                model_x = [model_ft.layer3[k].downsample[0], 
+                model_x = [model_ft.layer3[k].downsample[0],
                            model_ft.layer3[k].downsample[1]]
-            model_cx = [model_ft.layer3[k].conv1, 
+            model_cx = [model_ft.layer3[k].conv1,
                      model_ft.layer3[k].bn1,
                      model_ft.layer3[k].conv2,
                      model_ft.layer3[k].bn2,
                      model_ft.layer3[k].conv3,
                      model_ft.layer3[k].bn3]
             ResBlock3 += [Bottleneck(model_cx, model_x),]
-        
+
         #======================== depth 0 ==========================
         ResBlock4 = []
         for m in range(3):
             model_x = []
             model_cx = []
             if m == 0:
-                model_x = [model_ft.layer4[m].downsample[0], 
+                model_x = [model_ft.layer4[m].downsample[0],
                            model_ft.layer4[m].downsample[1]]
                 model_x[0].stride = (1, 1)
-                           
-            model_cx = [model_ft.layer4[m].conv1, 
+
+            model_cx = [model_ft.layer4[m].conv1,
                      model_ft.layer4[m].bn1,
                      model_ft.layer4[m].conv2,
                      model_ft.layer4[m].bn2,
@@ -500,13 +501,13 @@ class UnetSkipConnectionBlock(nn.Module):
             model_cx[2].dilation = (2, 2)
             model_cx[2].padding = (2, 2)
             ResBlock4 += [Bottleneck(model_cx, model_x),]
-            
+
         #======================== depth -1 ==========================
         ResBlock5 = []
         conv_list = nn.ModuleList()
         conv1 = nn.Conv2d(inner_nc, outer_nc, kernel_size=1)
         conv_list.append(conv1)
-        
+
         for n in range(1, 4):
             conv3 = nn.Conv2d(inner_nc, outer_nc, kernel_size=3)
             conv3.stride = (1, 1)
@@ -515,17 +516,17 @@ class UnetSkipConnectionBlock(nn.Module):
             conv_list.append(conv3)
         ResBlock5 += [ASPP_Module(outer_nc, conv_list)]
          #======================== end =============================
-         
+
         if type(norm_layer) == functools.partial:
             use_bias = norm_layer.func == nn.InstanceNorm2d
         else:
             use_bias = norm_layer == nn.InstanceNorm2d
         if input_nc is None:
             input_nc = outer_nc
-        
+
         uprelu = nn.ReLU(False)
         upnorm = norm_layer(outer_nc)
-        
+
         if depth == 4:
             down = ResBlock0
             upconv = nn.ConvTranspose2d(inner_nc * 2, outer_nc,
@@ -534,7 +535,7 @@ class UnetSkipConnectionBlock(nn.Module):
             up = [uprelu, upconv]
             model = down + [submodule] + up
             self.U4 = nn.Sequential(*model)
-            
+
         if depth == 3:
             down = ResBlock1
             upconv = nn.ConvTranspose2d(inner_nc * 2, outer_nc,
@@ -549,7 +550,7 @@ class UnetSkipConnectionBlock(nn.Module):
             self.U3 = nn.Sequential(*model)
             self.con3 = nn.Conv2d(outer_nc, outer_nc, kernel_size=1)
             self.con3.weight.data.normal_(0, 0.01)
-            
+
         if depth == 2:
             down = ResBlock2
             upconv = nn.ConvTranspose2d(inner_nc * 2, outer_nc,
@@ -564,7 +565,7 @@ class UnetSkipConnectionBlock(nn.Module):
             self.U2 = nn.Sequential(*model)
             self.con2 = nn.Conv2d(outer_nc, outer_nc, kernel_size=1)
             self.con2.weight.data.normal_(0, 0.01)
-        
+
         if depth == 1:
             down = ResBlock3
             upconv = nn.ConvTranspose2d(inner_nc * 2, outer_nc,
@@ -578,7 +579,7 @@ class UnetSkipConnectionBlock(nn.Module):
             self.U1 = nn.Sequential(*model)
             self.con1 = nn.Conv2d(outer_nc, outer_nc, kernel_size=1)
             self.con1.weight.data.normal_(0, 0.01)
-            
+
         if depth == 0:
             down = ResBlock4
             upconv = nn.ConvTranspose2d(inner_nc, outer_nc,
@@ -592,18 +593,18 @@ class UnetSkipConnectionBlock(nn.Module):
             self.U0 = nn.Sequential(*model)
             self.con0 = nn.Conv2d(outer_nc, outer_nc, kernel_size=1)
             self.con0.weight.data.normal_(0, 0.01)
-        
+
         if depth == -1: #idiot layer, forwards x straightly to next Unet block
             model = [submodule]
             self.U_1 = nn.Sequential(*model)
-        
-        if depth == -2: #model(x) forwards to Hook 
+
+        if depth == -2: #model(x) forwards to Hook
             down = ResBlock5
             #up = [nn.Upsample(256, mode='bilinear'),]
             lsm = [nn.LogSoftmax(),]
             model = down + lsm
             self.U_2 = nn.Sequential(*model)
-                
+
     def forward(self, x):
         if self.depth == 4:
             sm = nn.Softmax2d()
