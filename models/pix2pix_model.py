@@ -30,6 +30,9 @@ class Pix2PixModel(BaseModel):
                                    int(opt.fineSize * 1.25), int(opt.fineSize * 1.25))
         
         self.input_A_Attribute = self.Tensor(opt.batchSize, opt.input_nc, int(opt.fineSize/16), int(opt.fineSize/16))
+
+        self.input_test_A = self.Tensor(opt.batchSize, opt.input_nc,
+                                   opt.fineSize, opt.fineSize)
         
         self.input_B_GAN = self.Tensor(opt.batchSize, opt.output_nc,
                                    opt.fineSize, opt.fineSize)
@@ -41,6 +44,9 @@ class Pix2PixModel(BaseModel):
         
         self.input_B_Attribute_L1 = self.LongTensor(opt.batchSize, 
                                     int(opt.fineSize/16), int(opt.fineSize/16))
+
+        self.input_test_B_GAN = self.Tensor(opt.batchSize, opt.output_nc,
+                                   opt.fineSize, opt.fineSize)
         
         #define hook
         self.hook = networks.UnetHook()
@@ -138,33 +144,45 @@ class Pix2PixModel(BaseModel):
         input_A_S = input['A_S']
         input_A_L = input['A_L']
         input_A_Attribute = input['A_Attribute']
+        input_test_A = input['test_A']
         
         input_B_GAN = input['B_GAN']
         input_B_L1 = input['B_L1']
         input_B_Attribute_L1 = input['B_Attribute_L1']
         input_B_Attribute_GAN = input['B_Attribute_GAN']
+        input_test_B_GAN = input['test_B_GAN']
+
         
         #G1
         self.input_A.resize_(input_A.size()).copy_(input_A)
         self.input_A_S.resize_(input_A_S.size()).copy_(input_A_S)
         self.input_A_L.resize_(input_A_L.size()).copy_(input_A_L)
         self.input_A_Attribute.resize_(input_A_Attribute.size()).copy_(input_A_Attribute)
+
+        self.input_test_A.resize_(input_test_A.size()).copy_(input_test_A)
+
         
         self.input_B_GAN.resize_(input_B_GAN.size()).copy_(input_B_GAN)
         self.input_B_L1.resize_(input_B_L1.size()).copy_(input_B_L1)
         self.input_B_Attribute_GAN.resize_(input_B_Attribute_GAN.size()).copy_(input_B_Attribute_GAN)
         self.input_B_Attribute_L1.resize_(input_B_Attribute_L1.size()).copy_(input_B_Attribute_L1)
+
+        self.input_test_B_GAN.resize_(input_test_B_GAN.size()).copy_(input_test_B_GAN)
         
         
     def forward(self):
         self.real_A = Variable(self.input_A)
         self.real_A_Attribute = Variable(self.input_A_Attribute)
 
+        self.real_test_A = Variable(self.input_test_A)
+
         #Copy from files
         self.real_B_GAN = Variable(self.input_B_GAN) #multi-channel target for label map
         self.real_B_L1 = Variable(self.input_B_L1) #single-channel target for label map
         self.real_B_Attribute_GAN = Variable(self.input_B_Attribute_GAN) #multi-channel target for thumbnail
         self.real_B_Attribute_L1 = Variable(self.input_B_Attribute_L1) # single-channel target for thumbnail
+
+        self.real_test_B_GAN = Variable(self.input_test_B_GAN)  # multi-channel target for label map
 
         #Generate from networks
         self.fake_B_GAN = self.netG(self.real_A)['GAN'] #multi-channel label map--> target real_B_GAN
@@ -298,6 +316,12 @@ class Pix2PixModel(BaseModel):
         self.optimizer_G.zero_grad()
         self.backward_G()
         self.optimizer_G.step()
+
+        self.netG.eval()
+        self.fake_test_B_GAN = self.netG(self.real_test_A)['GAN']  # multi-channel label map--> target real_B_GAN
+        self.netG.train()
+
+
         
     
     def get_current_errors(self):
@@ -315,7 +339,10 @@ class Pix2PixModel(BaseModel):
         real_A = util.tensor2im(self.real_A.data)
         fake_B = util.ndim_tensor2im(self.fake_B_GAN.data, dataset = self.opt.dataset)
         real_B = util.ndim_tensor2im(self.real_B_GAN.data, dataset = self.opt.dataset)
-        return OrderedDict([('real_A', real_A), ('fake_B', fake_B), ('real_B', real_B)])
+        real_test_A = util.tensor2im(self.real_test_A.data)
+        fake_test_B = util.ndim_tensor2im(self.fake_test_B_GAN.data, dataset = self.opt.dataset)
+        real_test_B = util.ndim_tensor2im(self.real_test_B_GAN.data, dataset = self.opt.dataset)
+        return OrderedDict([('real_A', real_A), ('fake_B', fake_B), ('real_B', real_B), ('real_test_A', real_test_A), ('fake_test_B', fake_test_B),('real_test_B', real_test_B)])
 
     def save(self, label):
         self.epoch = self.epoch + 1

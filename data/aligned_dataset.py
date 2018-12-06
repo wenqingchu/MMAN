@@ -90,9 +90,13 @@ class AlignedDataset(BaseDataset):
         self.opt = opt
         self.root = opt.dataroot
         self.dir_A = os.path.join(opt.dataroot, opt.phase+ '_' + opt.dataset + '_A')
+        self.dir_test_A = os.path.join(opt.dataroot, 'test'+ '_' + opt.dataset + '_A')
         self.A_paths = sorted(make_dataset(self.dir_A))
+        self.test_A_paths = sorted(make_dataset(self.dir_test_A))
         self.dir_B = os.path.join(opt.dataroot, opt.phase+ '_' + opt.dataset + '_B')
+        self.dir_test_B = os.path.join(opt.dataroot, 'test' + '_' + opt.dataset + '_B')
         self.B_paths = sorted(make_dataset(self.dir_B))
+        self.test_B_paths = sorted(make_dataset(self.dir_test_B))
 
         assert(len(self.A_paths) == len(self.B_paths))
         assert(opt.resize_or_crop == 'resize_and_crop')
@@ -110,10 +114,18 @@ class AlignedDataset(BaseDataset):
         A_S = A.resize((int(self.opt.loadSize * 0.75), int(self.opt.loadSize * 0.75)), Image.LANCZOS)
         A_L = A.resize((int(self.opt.loadSize * 1.25), int(self.opt.loadSize * 1.25)), Image.LANCZOS)
         A_attribute = A.resize((int(self.opt.fineSize/16) , int(self.opt.fineSize/16)), Image.LANCZOS)
+
+        test_A_path = self.test_A_paths[index%100]
+        test_A = Image.open(test_A_path)
+        test_A = test_A.resize((self.opt.fineSize, self.opt.fineSize), Image.LANCZOS)
         
         B_path = self.B_paths[index]
         B = Image.open(B_path)
         B = B.resize((self.opt.loadSize , self.opt.loadSize), Image.NEAREST)
+
+        test_B_path = self.test_B_paths[index%100]
+        test_B = Image.open(test_B_path)
+        test_B = test_B.resize((self.opt.fineSize, self.opt.fineSize), Image.NEAREST)
         
         if self.opt.loadSize > self.opt.fineSize:
             if random.random() < 0.4:
@@ -153,11 +165,15 @@ class AlignedDataset(BaseDataset):
         A_L = self.transform(A_L)
         A_attribute = self.transform(A_attribute)
 
+        test_A = self.transform(test_A)
+
         B_L1 = channel_1to1(B)# single channel long tensor
         B_attribute_L1 = B.resize((int(self.opt.fineSize/16) , int(self.opt.fineSize/16)), Image.NEAREST)
         B = channel_1toN(B, self.opt.output_nc) # multi channel float tensor
         B_attribute_GAN = channel_1toN(B_attribute_L1, self.opt.output_nc) # multi channel float tensor for thumbnail
         B_attribute_L1 = channel_1to1(B_attribute_L1)
+
+        test_B = channel_1toN(test_B, self.opt.output_nc) # multi channel float tensor
                 
         if self.opt.which_direction == 'BtoA':
             input_nc = self.opt.output_nc
@@ -201,7 +217,7 @@ class AlignedDataset(BaseDataset):
                 B_L1 = swap_1(B_L1, 2, 3)
                 B_L1 = swap_1(B_L1, 4, 5)
 
-        return {'A': A, 'A_S': A_S, 'A_L': A_L, 'B_L1': B_L1, 'B_GAN': B, 
+        return {'A': A, 'A_S': A_S, 'A_L': A_L, 'B_L1': B_L1, 'B_GAN': B, 'test_A': test_A, 'test_B_GAN': test_B,
                 'A_Attribute': A_attribute, 
                 'B_Attribute_L1': B_attribute_L1, 
                 'B_Attribute_GAN': B_attribute_GAN, 
