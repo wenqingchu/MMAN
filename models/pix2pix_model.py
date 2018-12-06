@@ -222,7 +222,12 @@ class Pix2PixModel(BaseModel):
             self.fake_B_flip_flip = swap(self.fake_B_flip_flip, 14, 15)
             self.fake_B_flip_flip = swap(self.fake_B_flip_flip, 16, 17)
             self.fake_B_flip_flip = swap(self.fake_B_flip_flip, 18, 19)
-        
+
+        if self.opt.dataset == 'helen':
+            self.fake_B_flip_flip = swap(self.fake_B_flip_flip, 2, 3)
+            self.fake_B_flip_flip = swap(self.fake_B_flip_flip, 4, 5)
+            #self.fake_B_flip_flip = swap(self.fake_B_flip_flip, 18, 19)
+
         self.real_A_flip_S = self.real_A_S.index_select(3, idx_S)
         self.fake_B_flip_S = self.netG(self.real_A_flip_S)['GAN']
         self.fake_B_flip_flip_S = self.fake_B_flip_S.index_select(3, idx_S)
@@ -230,6 +235,12 @@ class Pix2PixModel(BaseModel):
             self.fake_B_flip_flip_S = swap(self.fake_B_flip_flip_S, 14, 15)
             self.fake_B_flip_flip_S = swap(self.fake_B_flip_flip_S, 16, 17)
             self.fake_B_flip_flip_S = swap(self.fake_B_flip_flip_S, 18, 19)
+
+        if self.opt.dataset == 'helen':
+            self.fake_B_flip_flip_S = swap(self.fake_B_flip_flip_S, 2, 3)
+            self.fake_B_flip_flip_S = swap(self.fake_B_flip_flip_S, 4, 5)
+            #self.fake_B_flip_flip_S = swap(self.fake_B_flip_flip_S, 18, 19)
+
         self.fake_B_flip_flip_S = M(self.fake_B_flip_flip_S)
         
         self.real_A_flip_L = self.real_A_L.index_select(3, idx_L)
@@ -239,6 +250,12 @@ class Pix2PixModel(BaseModel):
             self.fake_B_flip_flip_L = swap(self.fake_B_flip_flip_L, 14, 15)
             self.fake_B_flip_flip_L = swap(self.fake_B_flip_flip_L, 16, 17)
             self.fake_B_flip_flip_L = swap(self.fake_B_flip_flip_L, 18, 19)
+
+        if self.opt.dataset == 'helen':
+            self.fake_B_flip_flip_L = swap(self.fake_B_flip_flip_L, 2, 3)
+            self.fake_B_flip_flip_L = swap(self.fake_B_flip_flip_L, 4, 5)
+            #self.fake_B_flip_flip_L = swap(self.fake_B_flip_flip_L, 18, 19)
+
         self.fake_B_flip_flip_L = M(self.fake_B_flip_flip_L)
         
         self.fake_B_GAN = self.fake_B_GAN + self.fake_B_flip_flip + self.fake_B_GAN_S + self.fake_B_flip_flip_S + self.fake_B_GAN_L + self.fake_B_flip_flip_L
@@ -342,7 +359,9 @@ class Pix2PixModel(BaseModel):
         real_test_A = util.tensor2im(self.real_test_A.data)
         fake_test_B = util.ndim_tensor2im(self.fake_test_B_GAN.data, dataset = self.opt.dataset)
         real_test_B = util.ndim_tensor2im(self.real_test_B_GAN.data, dataset = self.opt.dataset)
-        return OrderedDict([('real_A', real_A), ('fake_B', fake_B), ('real_B', real_B), ('real_test_A', real_test_A), ('fake_test_B', fake_test_B),('real_test_B', real_test_B)])
+        #return OrderedDict([('real_A', real_A), ('fake_B', fake_B), ('real_B', real_B), ('real_test_A', real_test_A), ('fake_test_B', fake_test_B),('real_test_B', real_test_B)])
+        return OrderedDict([('real_A', real_A), ('fake_B', fake_B), ('real_B', real_B)])
+
 
     def save(self, label):
         self.epoch = self.epoch + 1
