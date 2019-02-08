@@ -27,7 +27,7 @@ def channel_1to1(img):
     img = (transform1(img) * 255.0).long()
     T.resize_(img[0].size()).copy_(img[0])
     return T.long()
-    
+
 def swap_1(T, m, n): #Distinguish left & right
     A = T.numpy()
     m_mask = np.where(A == m, 1, 0)
@@ -39,7 +39,7 @@ def swap_N(T, m, n): #Distinguish left & right
     A = T.numpy()
     A[[m, n], :, :] = A[[n, m], :, :]
     return torch.from_numpy(A)
-    
+
 def get_label(T, num_channel):
     A = T.numpy()
     R = torch.FloatTensor(num_channel).zero_()
@@ -54,7 +54,7 @@ class parts_crop():
         self.img = img
         self.attribute = attribute
         self.parts_bag = []
-    
+
     def get_parts(self):
         array = np.asarray(self.img)
         for i in range(1, self.attribute.size(0)):
@@ -67,22 +67,22 @@ class parts_crop():
                     if((array[:,w1] == i).any()):
                         break
                     w1  = w1 + 1
-                
+
                 while w2 > 0:
                     if((array[:,w2] == i).any()):
                         break
                     w2  = w2 - 1
-                        
+
                 while h1 < array.shape[0]:
                     if((array[h1,:] == i).any()):
                         break
                     h1  = h1 + 1
-                        
+
                 while h2 > 0:
                     if((array[h2,:] == i).any()):
                         break
                     h2  = h2 - 1
-                    
+
                 self.parts_bag.append(self.img.crop((w1, h1, w2, h2)))
 
 class AlignedDataset(BaseDataset):
@@ -98,14 +98,14 @@ class AlignedDataset(BaseDataset):
         self.B_paths = sorted(make_dataset(self.dir_B))
         self.test_B_paths = sorted(make_dataset(self.dir_test_B))
 
-        assert(len(self.A_paths) == len(self.B_paths))
+        #assert(len(self.A_paths) == len(self.B_paths))
         assert(opt.resize_or_crop == 'resize_and_crop')
-        
+
         transform_list = [transforms.ToTensor(),
                           transforms.Normalize((0.485, 0.456, 0.406),
                                                (0.229, 0.224, 0.225))]
         self.transform = transforms.Compose(transform_list)
-        
+
     def __getitem__(self, index):
 
         A_path = self.A_paths[index]
@@ -118,7 +118,7 @@ class AlignedDataset(BaseDataset):
         test_A_path = self.test_A_paths[index%100]
         test_A = Image.open(test_A_path)
         test_A = test_A.resize((self.opt.fineSize, self.opt.fineSize), Image.LANCZOS)
-        
+
         B_path = self.B_paths[index]
         B = Image.open(B_path)
         B = B.resize((self.opt.loadSize , self.opt.loadSize), Image.NEAREST)
@@ -126,40 +126,40 @@ class AlignedDataset(BaseDataset):
         test_B_path = self.test_B_paths[index%100]
         test_B = Image.open(test_B_path)
         test_B = test_B.resize((self.opt.fineSize, self.opt.fineSize), Image.NEAREST)
-        
+
         if self.opt.loadSize > self.opt.fineSize:
             if random.random() < 0.4:
                 area = A.size[0] * A.size[1]
                 target_area = random.uniform(0.64, 1) * area
                 aspect_ratio = random.uniform(4. / 5, 5. / 4)
-    
+
                 w = min(int(round(math.sqrt(target_area * aspect_ratio))), self.opt.loadSize)
                 h = min(int(round(math.sqrt(target_area / aspect_ratio))), self.opt.loadSize)
-    
+
                 if random.random() < 0.5:
                     w, h = h, w
-    
+
                 if w <= A.size[0] and h <= A.size[1]:
                     x1 = random.randint(0, A.size[0] - w)
                     y1 = random.randint(0, A.size[1] - h)
-    
+
                     A = A.crop((x1, y1, x1 + w, y1 + h))
                     B = B.crop((x1, y1, x1 + w, y1 + h))
                     assert(A.size == (w, h))
-                
+
                 A = A.resize((self.opt.fineSize , self.opt.fineSize), Image.LANCZOS)
                 B = B.resize((self.opt.fineSize , self.opt.fineSize), Image.NEAREST)
-            
+
             elif  0.4 < random.random() < 0.95:
                 w_offset = random.randint(0, max(0, A.size[1] - self.opt.fineSize - 1))
                 h_offset = random.randint(0, max(0, A.size[0] - self.opt.fineSize - 1))
                 A = A.crop((w_offset, h_offset, w_offset + self.opt.fineSize, h_offset + self.opt.fineSize))
                 B = B.crop((w_offset, h_offset, w_offset + self.opt.fineSize, h_offset + self.opt.fineSize))
-            
+
             else:
                 A = A.resize((self.opt.fineSize , self.opt.fineSize), Image.LANCZOS)
                 B = B.resize((self.opt.fineSize , self.opt.fineSize), Image.NEAREST)
-        
+
         A = self.transform(A)
         A_S = self.transform(A_S)
         A_L = self.transform(A_L)
@@ -174,7 +174,7 @@ class AlignedDataset(BaseDataset):
         B_attribute_L1 = channel_1to1(B_attribute_L1)
 
         test_B = channel_1toN(test_B, self.opt.output_nc) # multi channel float tensor
-                
+
         if self.opt.which_direction == 'BtoA':
             input_nc = self.opt.output_nc
             output_nc = self.opt.input_nc
@@ -218,9 +218,9 @@ class AlignedDataset(BaseDataset):
                 B_L1 = swap_1(B_L1, 4, 5)
 
         return {'A': A, 'A_S': A_S, 'A_L': A_L, 'B_L1': B_L1, 'B_GAN': B, 'test_A': test_A, 'test_B_GAN': test_B,
-                'A_Attribute': A_attribute, 
-                'B_Attribute_L1': B_attribute_L1, 
-                'B_Attribute_GAN': B_attribute_GAN, 
+                'A_Attribute': A_attribute,
+                'B_Attribute_L1': B_attribute_L1,
+                'B_Attribute_GAN': B_attribute_GAN,
                 'A_paths': A_path, 'B_paths': B_path}
     def __len__(self):
         return len(self.A_paths)
